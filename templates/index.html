@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Yu-Gi-Oh Deck Calculator</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* BODY & GENERAL */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0b0f2c, #001a4d);
+            color: #ffffff;
+            margin: 0;
+            padding: 40px;
+        }
+        h1 {
+            text-align: center;
+            color: #00bfff;
+            font-size: 48px;
+            margin-bottom: 40px;
+            text-shadow: 0 0 10px #00bfff;
+        }
+
+        /* FORM */
+        form {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 50px;
+            background-color: rgba(0,0,0,0.5);
+            padding: 20px 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,191,255,0.3);
+        }
+        .category {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        input[type="text"], input[type="number"] {
+            width: 70px;
+            padding: 8px;
+            border-radius: 8px;
+            border: none;
+            outline: none;
+            font-weight: bold;
+            text-align: center;
+        }
+        input[type="checkbox"] {
+            transform: scale(1.2);
+        }
+        button {
+            padding: 12px 25px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 10px;
+            border: none;
+            background: linear-gradient(135deg, #00bfff, #0095d9);
+            color: #000;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 20px rgba(0,191,255,0.6);
+        }
+
+        /* RESULTS CARDS */
+        .results {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            justify-content: center;
+        }
+        .card {
+            background-color: #001a4d;
+            border-radius: 15px;
+            padding: 20px;
+            width: 320px;
+            box-shadow: 0 5px 15px rgba(0,191,255,0.3);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .card:hover {
+            transform: translateY(-7px);
+            box-shadow: 0 15px 25px rgba(0,191,255,0.5);
+        }
+        .card h2 {
+            text-align: center;
+            color: #00bfff;
+            margin-bottom: 15px;
+            text-shadow: 0 0 5px #00bfff;
+        }
+
+        /* TABLE STYLING */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+        th, td {
+            border: 1px solid #00bfff;
+            padding: 6px;
+            text-align: center;
+        }
+        th {
+            background: linear-gradient(135deg, #003366, #0055a0);
+            font-weight: bold;
+        }
+        td {
+            background-color: #0b0f2c;
+        }
+        .subheading {
+            font-weight: bold;
+            margin-top: 10px;
+            margin-bottom: 5px;
+            color: #00ffff;
+            text-align: center;
+        }
+
+        /* CHARTS */
+        canvas {
+            margin-top: 10px;
+            border-radius: 8px;
+            background-color: #001a4d;
+        }
+    </style>
+</head>
+<body>
+    <h1>Yu-Gi-Oh Deck Calculator</h1>
+
+    <form method="POST">
+        <div class="category">
+            <label>Deck Size:</label>
+            <input type="number" name="deck_size" value="{{ request.form.deck_size or 40 }}" min="1">
+        </div>
+        <div class="category">
+            <label>Hand Size:</label>
+            <input type="number" name="hand_size" value="{{ request.form.hand_size or 5 }}" min="1">
+        </div>
+
+        <div class="category">
+            <input type="checkbox" name="calc_starters" {% if 'starter' in results %}checked{% endif %}>
+            <label>Starters</label>
+            <input type="text" name="starters" value="{{ request.form.starters or '12' }}">
+        </div>
+        <div class="category">
+            <input type="checkbox" name="calc_ht" {% if 'ht' in results %}checked{% endif %}>
+            <label>Hand Traps</label>
+            <input type="text" name="hand_traps" value="{{ request.form.hand_traps or '9' }}">
+        </div>
+        <div class="category">
+            <input type="checkbox" name="calc_engine" {% if 'engine' in results %}checked{% endif %}>
+            <label>Engine Requirements</label>
+            <input type="text" name="engine" value="{{ request.form.engine or '3' }}">
+        </div>
+
+        <button type="submit">Calculate</button>
+    </form>
+
+    {% if results %}
+    <div class="results">
+        {% for cat in ['starter','ht','engine'] %}
+            {% if results[cat] %}
+                {% for num, data in results[cat].items() %}
+                <div class="card">
+                    <h2>{{ num }} {{ 'Starter(s)' if cat=='starter' else 'Hand Trap(s)' if cat=='ht' else 'Engine Card(s)' }}</h2>
+
+                    <div class="subheading">Exact Probabilities</div>
+                    <table>
+                        <tr><th>k</th><th>%</th></tr>
+                        {% for k, p in data.exact %}
+                        <tr><td>{{ k }}</td><td>{{ p }}%</td></tr>
+                        {% endfor %}
+                    </table>
+
+                    <div class="subheading">Cumulative Probabilities (≥k)</div>
+                    <table>
+                        <tr><th>k</th><th>%</th></tr>
+                        {% for k, p in data.cumulative.items() %}
+                        <tr><td>≥{{ k }}</td><td>{{ p }}%</td></tr>
+                        {% endfor %}
+                    </table>
+<canvas id="{{ cat }}_chart_{{ num }}" width="280" height="150"></canvas>
+<script>
+const ctx_{{ cat }}_{{ num }} = document.getElementById('{{ cat }}_chart_{{ num }}').getContext('2d');
+
+new Chart(ctx_{{ cat }}_{{ num }}, {
+    type: 'bar',
+    data: {
+        labels: [{% for k,_ in data.exact %} '{{ k }}',{% endfor %}],
+        datasets: [{
+            label: 'Exact %',
+            data: [{% for _,p in data.exact %} {{ p }},{% endfor %}],
+            backgroundColor: 'rgba(0,191,255,0.6)',
+            borderColor: 'rgba(0,191,255,1)',
+            borderWidth: 1,
+            hoverBackgroundColor: 'rgba(0,255,255,0.8)', // culoare la hover
+            hoverBorderWidth: 2, // border mai gros la hover
+        }]
+    },
+    options: {
+        responsive: false,
+        plugins: {
+            legend: { display: false },
+            tooltip: { enabled: true } // arată tooltip cu exact % la hover
+        },
+        interaction: {
+            mode: 'nearest', 
+            axis: 'x',
+            intersect: true
+        },
+        scales: {
+            y: { beginAtZero: true }
+        }
+    }
+});
+</script>
+
+
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+</body>
+</html>
